@@ -10,41 +10,12 @@
 using namespace sf;
 using namespace std;
 
-//расстояние между точками (дляна вектора)
+//расстояние между точками (длина вектора)
 float getLengthVector(float x[2], float y[2])
 {
 	return sqrt(pow(x[0] - y[0], 2) + pow(x[1] - y[1], 2));
 }
 
-//получить угол по его синусу и косинусу
-int getAngle(float sx, float sy)
-{
-	//вытащили синус из основного тригонометрического тождества
-	float result = sqrt(sx * sx + sy * sy);
-	float cosin = abs(sx / result);
-	float sinus = abs(sy / result);
-
-	int angle = 0;
-	int fourth = 0;
-//определяю в какой четверти прямая
-	if (sx >= 0 && sy >= 0) fourth = 0; else
-	if (sx <= 0 && sy >= 0) fourth = 1; else
-	if (sx <= 0 && sy <= 0) fourth = 2; else
-	if (sx >= 0 && sy <= 0) fourth = 3; else
-
-		//преобразовать радианы в градусы
-	angle = asin(sinus) * 57.29577951308232;
-
-	angle = angle + 90 * fourth;
-	//если граничное
-	if (sx == 0 && sy > 0) angle = 90;
-	if (sx == 0 && sy < 0) angle = 270;
-	if (sy == 0 && sx > 0) angle = 0;
-	if (sy == 0 && sx < 0) angle = 180;
-
-	if (sx == 0 && sy == 0) return 0; 
-	else return angle;
-}
 
 int main()
 {
@@ -54,130 +25,88 @@ int main()
 	//длина/ширина экрана
 	int W = GetSystemMetrics(SM_CXSCREEN);
 	int H = GetSystemMetrics(SM_CYSCREEN);
+	
 
-	float stuffy = -126;// ?
-	float culldown = 5;// ?
-	const int countLenses = 1; //количество линз
+	const int countLenses = 15; //количество линз
+	int count = 1;
+	int refractiveIndexLenses[countLenses]; //показатель преломления
+	int lensData[15][4] = { int(W / 2), int(H / 2), 0, 1}; //данные о линзах (координаты, угол, ?)
 
-	int refractiveIndexLenses[countLenses]; //толщина линз, от которой зависит преломляющая способность 
-	int lensData[countLenses][4] = { int(W / 2), int(H / 2), 0, 20 }; //данные о линзах (координаты, угол, )
-	int lightershit[3] = { 100, int(H / 2), 0 };//параметры источника света, координаты и угол относительно x
-
-	int folowing = 0;
-	int mousechange[2];
+	int lightParam[3] = { 100, int(H / 2), 0 };//параметры источника света, координаты и угол относительно x
+	int lightFolow = 0;//флаг следования, чтобы двигать прелметы
 
 	//расстявляю имеющиеся линзы на экране
 	for (int i = 0; i < countLenses; i++)
 	{
 		lensData[i][0] = int(W / 2) + i * 30;
-		lensData[i][1] = int(H / 2);
+		lensData[i][1] = int(H / 2)+30;
 		lensData[i][2] = 0;
 		refractiveIndexLenses[i] = 15;
 	}
 
-	Font font;
-	font.loadFromFile("font.ttf");
-	Text text("", font, 24);
-	text.setFillColor(Color(120, 120, 120));
-	text.setStyle(sf::Text::Bold);
-
-	Image exit_image;
-	exit_image.loadFromFile("images/exitimage.png");
-	exit_image.createMaskFromColor(Color(255, 255, 255));
-	Texture exit_t;
-	exit_t.loadFromImage(exit_image);
-	Sprite s_exit;
-	s_exit.setTexture(exit_t);
-
+	//источник света (световой меч)
 	Image lighter_image;
-	lighter_image.loadFromFile("images/stuff.png");
+	lighter_image.loadFromFile("images/light2.png");
 	lighter_image.createMaskFromColor(Color(255, 255, 255));
 	Texture lighter_t;
 	lighter_t.loadFromImage(lighter_image);
 	Sprite s_lighter;
 	s_lighter.setTexture(lighter_t);
-	s_lighter.setTextureRect(IntRect(0, 64, 128, 56));
-	s_lighter.setPosition(lightershit[0], lightershit[1]);
-	s_lighter.setRotation(lightershit[2]);
+	s_lighter.setTextureRect(IntRect(0, 2, 150, 58));
+	s_lighter.setPosition(lightParam[0], lightParam[1]);
+	s_lighter.setRotation(lightParam[2]);
 
-
-	Image bg_image;
-	//bg_image.loadFromFile("images/bg.png");
-	bg_image.createMaskFromColor(Color(255, 255, 255));
-	Texture bg_t;
-	bg_t.loadFromImage(bg_image);
-	Sprite s_bg;
-	s_bg.setTexture(bg_t);
-	s_bg.setScale((float(W) / float(1366)), (float(H) / float(768)));
-	s_bg.setPosition(0, 0);
-
-	Image smallbg_image;
-	smallbg_image.loadFromFile("images/stuff.png");
-	smallbg_image.createMaskFromColor(Color(255, 255, 255));
-	Texture smallbg_t;
-	smallbg_t.loadFromImage(smallbg_image);
-	Sprite smalls_bg;
-	smalls_bg.setTexture(smallbg_t);
-	smalls_bg.setTextureRect(IntRect(8, 8, 42, 14));
-	smalls_bg.setScale(3, 3);
-
+	
+	//лучи
 	Image point_image;
-	point_image.loadFromFile("images/stuff.png");
-	point_image.createMaskFromColor(Color(255, 255, 255));
+	point_image.loadFromFile("images/light2.png");
+	point_image.createMaskFromColor(Color(255, 255, 255, 100));
 	Texture point_t;
 	point_t.loadFromImage(point_image);
+
 	Sprite point_s[2];
 	point_s[0].setTexture(point_t);
 	point_s[1].setTexture(point_t);
-	point_s[0].setTextureRect(IntRect(128, 0, 1, 1));
-	point_s[1].setTextureRect(IntRect(134, 0, 2, 2));
+	point_s[0].setTextureRect(IntRect(0, 0, 1, 1));
+	point_s[1].setTextureRect(IntRect(0, 0, 2, 2));
+	
 	point_s[0].setPosition(0, 0);
 	point_s[1].setPosition(0, 0);
 	point_s[0].setColor(Color(255, 255, 255, 140));
 	point_s[1].setColor(Color(255, 255, 255, 180));
+	
 
-	Image stuff_image;
-	stuff_image.loadFromFile("images/stuff.png");
-	stuff_image.createMaskFromColor(Color(255, 255, 255));
-	Texture stuff_t;
-	stuff_t.loadFromImage(stuff_image);
-	const int qofstuff = 4;
-	Sprite s_stuff[4];
-	for (int i = 0; i < qofstuff; i++)
-	{
-		s_stuff[i].setTexture(stuff_t);
-		if (i % 2 == 0) s_stuff[i].setTextureRect(IntRect(0, 0, 64, 64));
-		else s_stuff[i].setTextureRect(IntRect(64, 0, 64, 64));
-	}
-
-	//Координаты кнопок
-	if (true)
-	{
-		s_stuff[0].setPosition(W - 128, H - 64);
-		s_stuff[1].setPosition(W - 64, H - 64);
-		s_stuff[2].setPosition(W - 256, H - 64);
-		s_stuff[3].setPosition(W - 192, H - 64);
-	}
-
-	RenderWindow window(sf::VideoMode(W, H), "Optics", Style::Fullscreen);
+	//задаю окно
+	RenderWindow window(sf::VideoMode(W, H), "KursProject");
+	//задаю экран
 	view.reset(sf::FloatRect(0, 0, W, H));
+	//задаю позицию окна
 	window.setPosition(Vector2i(0, 0));
-	Clock clock;
-	getplayercoordinateforview(int(W / 2), int(H / 2));
 
-	float mouseshit[2] = { 0, 0 };
+	Clock clock;
+
+	getplayercoordinateforview(int(W / 2), int(H / 2));
+	//коордлинаты указателя
+	float mousePlace[2] = { 0, 0 };
+	//?
 	float optimiz = 8;
 
-	int choosenlens = -1;
+   //индекс активной линзы
+	int choosenLens = -1;
 
-	int choosenlight = 0;
-	bool shiiiiiiiiiit = false;
+	//флаг активности источника
+	int choosenLight = 0;
 
+	//?
+	bool flag1 = false;
+
+	//изображение линз
 	Image len_image;
-	len_image.create(500, 200, Color(255, 255, 255));
+	len_image.create(500, 200, Color(255, 0, 255));
 	len_image.createMaskFromColor(Color(255, 255, 255));
 	Texture len_t[countLenses];
 	Sprite s_len[countLenses];
+
 	for (int i = 0; i < countLenses; i++)
 	{
 		len_t[i].loadFromImage(len_image);
@@ -185,148 +114,146 @@ int main()
 		s_len[i].setRotation(lensData[i][2]);
 		s_len[i].setPosition(lensData[i][0], lensData[i][1]);
 		s_len[i].setOrigin(250, 100);
-		lensData[i][3] = 1;
+		lensData[i][3] = 1; //?
 	}
 
+//
+//НАЧАЛО ЦИКЛА
+//
 	while (window.isOpen())
 	{
-		float time = clock.getElapsedTime().asMilliseconds();
-		clock.restart();
-		if (culldown < 5) culldown += time * 0.05;
-		if (culldown >= 5)
-		{
-			for (int i = 0; i < qofstuff; i++)
-				s_stuff[i].setColor(Color(255, 255, 255));
-		}
+		//для работы без глюков
+		float time = clock.getElapsedTime().asMilliseconds();  //дать прошедшее время в микросекундах
+		clock.restart(); //перезагружает время
 
-		if (Keyboard::isKeyPressed(Keyboard::Escape))
-		{
-			s_exit.setColor(Color(200, 200, 200));
-			window.draw(s_exit);
-			window.display();
-			Sleep(300);
-			window.close();
-		}
-		if (Keyboard::isKeyPressed(Keyboard::Q) && shiiiiiiiiiit)
-		{
-			choosenlight--; Sleep(100);
-		}
-		if (Keyboard::isKeyPressed(Keyboard::W) && shiiiiiiiiiit)
-		{
-			choosenlight++; Sleep(100);
-		}
 
-		Vector2i pixelPos = Mouse::getPosition(window);
-		Vector2f pos = window.mapPixelToCoords(pixelPos);
+		Vector2i pixelPos = Mouse::getPosition(window); //получение координат мыши
+		Vector2f mousePosition = window.mapPixelToCoords(pixelPos); //конвертируем координаты
 		Event event;
 
+		//
+		//ЦИКЛ СОБЫТИЙ
+		//
 		while (window.pollEvent(event))
 		{
+			//закрыть 
 			if (event.type == sf::Event::Closed)
 				window.close();
-			if (event.type == Event::MouseButtonPressed)//если нажата клавиша мыши
-				if (event.key.code == Mouse::Left) {//а именно левая
-					if (s_exit.getGlobalBounds().contains(pos.x, pos.y))//и при этом координата курсора попадает в спрайт
+
+			//если нажата клавиша мыши
+			if (event.type == Event::MouseButtonPressed)
+				if (event.key.code == Mouse::Left) 
+				{
+					// координата курсора попадает в спрайт источника света
+					if (s_lighter.getGlobalBounds().contains(mousePosition.x, mousePosition.y))
 					{
-						s_exit.setColor(Color::Green);
-						window.draw(s_exit);
-						window.display();
-						Sleep(300);
-						window.close();
+						choosenLight = 1;
+						lightFolow = 1;  //привязка объекта к мыши
+						choosenLens = -1; //разактивация линз, если были активные
+						s_lighter.setColor(Color(220, 220, 220)); //выделение светом источника
 					}
-					if (s_lighter.getGlobalBounds().contains(pos.x, pos.y))//и при этом координата курсора попадает в спрайт
-					{
-						folowing = 1; choosenlens = -1;
-						s_lighter.setColor(Color(220, 220, 220));
-					}
-					int shitfuck = 30;
-					for (int i = 0; i < countLenses; i++)
-						if (pos.x > lensData[i][0] - shitfuck && pos.x < lensData[i][0] + shitfuck && pos.y > lensData[i][1] - shitfuck && pos.y < lensData[i][1] + shitfuck)//и при этом координата курсора попадает в спрайт
+
+					//проверяю спрайты линз
+					int offsetSprite = 30;
+					for (int i = 0; i < count; i++)
+						if (mousePosition.x > lensData[i][0] -( offsetSprite) && mousePosition.x < lensData[i][0] + (offsetSprite) && mousePosition.y > lensData[i][1] - (3*offsetSprite) && mousePosition.y < lensData[i][1] + (3*offsetSprite))
 						{
-							folowing = 2 + i;
-							choosenlens = i;
+							lightFolow = 2 + i;//указываем индекс активного бъекта
+							choosenLens = i;
+							choosenLight = 0;
 						}
-					if (true)
-					{
-						int pressedbut = -1;
-						for (int i = 0; i < qofstuff; i++)
-							if (s_stuff[i].getGlobalBounds().contains(pos.x, pos.y))
-								pressedbut = i;
+		}
+			if (event.type == Event::MouseButtonReleased) //кнопка мыши выпущена
+				if (event.key.code == Mouse::Left) //а зажата была левая
+					lightFolow = 0; //обнуляем выбранный элемент
 
-						if (pressedbut == 0 && choosenlens != -1)
-						{
-							int secondrefr = refractiveIndexLenses[choosenlens];
-							if (Keyboard::isKeyPressed(Keyboard::LControl)) refractiveIndexLenses[choosenlens] -= 6;
-							else if (Keyboard::isKeyPressed(Keyboard::LShift)) refractiveIndexLenses[choosenlens] -= 24;
-							else refractiveIndexLenses[choosenlens] -= 12;
+			//вращение линз
+			int direction = 1;
 
-							float refr = ((refractiveIndexLenses[choosenlens] / 8) + 9 * refractiveIndexLenses[choosenlens] / abs(refractiveIndexLenses[choosenlens]));
-							int shit = int(sqrt(abs(pow(refr, 2))) / 10000);
-
-							if (abs(int(((shit * (1 - 0.05)) - refr * 0.05))) > 250)
-								refractiveIndexLenses[choosenlens] = secondrefr;
-							else
-								lensData[choosenlens][3] = 1;
-						}
-						if (pressedbut == 1 && choosenlens != -1)
-						{
-							int secondrefr = refractiveIndexLenses[choosenlens];
-							if (Keyboard::isKeyPressed(Keyboard::LControl)) refractiveIndexLenses[choosenlens] += 6;
-							else if (Keyboard::isKeyPressed(Keyboard::LShift)) refractiveIndexLenses[choosenlens] += 24;
-							else refractiveIndexLenses[choosenlens] += 12;
-							float refr = ((refractiveIndexLenses[choosenlens] / 8) + 9 * refractiveIndexLenses[choosenlens] / abs(refractiveIndexLenses[choosenlens]));
-							int shit = int(sqrt(abs(pow(refr, 2))) / 10000);
-							if (abs(int(((shit * (1 - 0.05)) - refr * 0.05))) > 250)
-								refractiveIndexLenses[choosenlens] = secondrefr;
-							else
-								lensData[choosenlens][3] = 1;
-						}
-						if (pressedbut == 2) optimiz = optimiz * 2;
-						if (pressedbut == 3 && optimiz > 0) optimiz = optimiz / 2;
-
-						if (pressedbut != -1)
-						{
-							culldown = 0;
-							s_stuff[pressedbut].setColor(Color(200, 200, 200));
-						}
-					}
-				}
-			if (event.type == Event::MouseButtonReleased)
-				if (event.key.code == Mouse::Left)
-					folowing = 0;
-
-			if (event.type == Event::MouseWheelMoved)
+				if ((sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down) || sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))&& (choosenLens != -1|| choosenLight!=0))
 			{
-				if (folowing == 1)
+
+					if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up))
+						direction = -1;
+				if (choosenLight != 0)
 				{
-					lightershit[2] += event.key.code * 5;
-					while (lightershit[2] > 360) lightershit[2] -= 360;
-					while (lightershit[2] < 0) lightershit[2] += 360;
-					s_lighter.setRotation(lightershit[2]);
+					lightParam[2] += direction * event.key.code * 5;
+					while (lightParam[2] > 360) lightParam[2] -= 360;
+					while (lightParam[2] < 0) lightParam[2] += 360;
+					s_lighter.setRotation( lightParam[2]);
 				}
-				if (folowing > 1)
+				if (choosenLens != -1)
 				{
-					lensData[folowing - 2][2] += event.key.code * 5;
-					while (lensData[folowing - 2][2] > 360) lensData[folowing - 2][2] -= 360;
-					while (lensData[folowing - 2][2] < 0) lensData[folowing - 2][2] += 360;
-					s_len[folowing - 2].setRotation(lensData[folowing - 2][2]);
+					lensData[choosenLens][2] += direction *event.key.code * 5;
+					while (lensData[choosenLens][2] > 360) lensData[choosenLens][2] -= 360;
+					while (lensData[choosenLens][2] < 0) lensData[choosenLens][2] += 360;
+					s_len[choosenLens].setRotation(lensData[choosenLens][2]);
 				}
+
+				
 			}
+
+				//уменьшаю толщину линзы
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Left) && choosenLens != -1)
+				{
+					int secondrefr = refractiveIndexLenses[choosenLens];
+					if (Keyboard::isKeyPressed(Keyboard::LControl)) refractiveIndexLenses[choosenLens] -= 6;
+					else if (Keyboard::isKeyPressed(Keyboard::LShift)) refractiveIndexLenses[choosenLens] -= 24;
+					else refractiveIndexLenses[choosenLens] -= 12;
+
+					float refr = ((refractiveIndexLenses[choosenLens] / 8) + 9 * refractiveIndexLenses[choosenLens] / abs(refractiveIndexLenses[choosenLens]));
+					int helpContein = int(sqrt(abs(pow(refr, 2))) / 10000);
+
+					if (abs(int(((helpContein * (1 - 0.05)) - refr * 0.05))) > 250)
+						refractiveIndexLenses[choosenLens] = secondrefr;
+					else
+						lensData[choosenLens][3] = 1;
+
+				}
+
+				//увеличиваю толщину линзы
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Right) && choosenLens != -1)
+				{
+					int secondrefr = refractiveIndexLenses[choosenLens];
+					if (Keyboard::isKeyPressed(Keyboard::LControl)) refractiveIndexLenses[choosenLens] += 6;
+					else if (Keyboard::isKeyPressed(Keyboard::LShift)) refractiveIndexLenses[choosenLens] += 24;
+					else refractiveIndexLenses[choosenLens] += 12;
+					float refr = ((refractiveIndexLenses[choosenLens] / 8) + 9 * refractiveIndexLenses[choosenLens] / abs(refractiveIndexLenses[choosenLens]));
+					int helpContein = int(sqrt(abs(pow(refr, 2))) / 10000);
+					if (abs(int(((helpContein * (1 - 0.05)) - refr * 0.05))) > 250)
+						refractiveIndexLenses[choosenLens] = secondrefr;
+					else
+						lensData[choosenLens][3] = 1;
+				}
+
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Space))
+				{
+					if (countLenses > count)
+					{
+						count++;
+					}
+					
+				}
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::LShift)) optimiz = optimiz * 2;
+				if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::RShift) && optimiz > 0) optimiz = optimiz / 2;
+
 		}
 
-		if (folowing != 0)
+
+		if (lightFolow != 0)
 		{
-			if (folowing == 1)
+			//перемещение источника света
+			if (lightFolow == 1)
 			{
-				lightershit[0] += pos.x - mouseshit[0];
-				lightershit[1] += pos.y - mouseshit[1];
-				s_lighter.setPosition(lightershit[0], lightershit[1]);
+				lightParam[0] += mousePosition.x - mousePlace[0];
+				lightParam[1] += mousePosition.y - mousePlace[1];
+				s_lighter.setPosition(lightParam[0], lightParam[1]);
 			}
 			else
-			{
-				lensData[choosenlens][0] += pos.x - mouseshit[0];
-				lensData[choosenlens][1] += pos.y - mouseshit[1];
-				s_len[choosenlens].setPosition(lensData[choosenlens][0], lensData[choosenlens][1]);
+			{//перемещение линз
+				lensData[choosenLens][0] += mousePosition.x - mousePlace[0];
+				lensData[choosenLens][1] += mousePosition.y - mousePlace[1];
+				s_len[choosenLens].setPosition(lensData[choosenLens][0], lensData[choosenLens][1]);
 			}
 		}
 		else
@@ -334,96 +261,102 @@ int main()
 			s_lighter.setColor(Color(255, 255, 255));
 			point_s[0].setColor(Color(255, 255, 255, 150));
 		}
+		//получаем позицию мыши
+		mousePlace[0] = mousePosition.x;
+		mousePlace[1] = mousePosition.y;
 
-		mouseshit[0] = pos.x;
-		mouseshit[1] = pos.y;
-
-		if (pos.y > 128)
-		{
-			if (stuffy > -126) stuffy -= 0.5 * time;
-		}
-		else
-			if (stuffy < 0) stuffy += 0.5 * time;
-		if (stuffy > 0) stuffy = 0;
-		if (stuffy < -126) stuffy = -126;
 
 		window.setView(view);
 		window.clear();
 		window.getSystemHandle();
 
-		window.draw(s_bg);
 
 		if (true)
 		{
-			int light = -1;
-			//128 / 56
-			for (int i = 1; i < (54 / optimiz); i++)
+			int light = -1; //пробегает по линзам
+			//перечисляю лучи
+			for (int i = 1; i < (56 / optimiz); i++)
 			{
 				light++;
 				bool show = false;
-				float cosin = cos(lightershit[2] * 0.0175);
-				float sinus = sin(lightershit[2] * 0.0175);
-				float lightcords[2] = { int(lightershit[0] + int(((124 * cosin) - ((((i)*optimiz)) * sinus)))), int(lightershit[1] + int((128 * sinus) + ((((i)*optimiz)) * cosin))) };
+
+				
+				float cosin = cos(lightParam[2] * 0.0175);
+				float sinus = sin(lightParam[2] * 0.0175);
+
+				//вычисляю начало координат очередного луча
+				float lightcords[2] = { int(lightParam[0] + int(((146 * cosin) - ((((i)*optimiz)) * sinus)))), int(lightParam[1] + int((150 * sinus) + ((((i)*optimiz)) * cosin))) };
+				
 				point_s[1].setPosition(lightcords[0], lightcords[1]);
+				
 				float move[2];
-				move[0] = cos(lightershit[2] * 0.0175);
-				move[1] = sin(lightershit[2] * 0.0175);
-				if (light == choosenlight && shiiiiiiiiiit)
+				move[0] = cos(lightParam[2] * 0.0175);
+				move[1] = sin(lightParam[2] * 0.0175);
+
+				if (light == choosenLight && flag1)
 				{
 					show = true;
 					point_s[1].setColor(Color(255, 255, 255, 180));
 				}
 				else
-					if (shiiiiiiiiiit) point_s[1].setColor(Color(255, 0, 0, 180));
+					if (flag1) point_s[1].setColor(Color(255, 0, 0, 180));
+
+				//проходим по длинне луча
 
 				while (lightcords[0] > 0 && lightcords[0] < W && lightcords[1] > 0 && lightcords[1] < H)
 				{
-					bool lensishere = false;
-					int whichlens = 0;
-					for (int g = 0; g < countLenses; g++)
+					bool lensishere = false; //флаг наличия линзы
+					int whichlens = 0;//какая линза
+
+					//проходим по линзам
+					for (int g = 0; g < count; g++)
 					{
-						float shit[2];
-						shit[0] = lensData[g][0] - lightcords[0];
-						shit[1] = lensData[g][1] - lightcords[1];
+						float helpContein[2];
+
+						helpContein[0] = lensData[g][0] - lightcords[0];
+						helpContein[1] = lensData[g][1] - lightcords[1];
+
 						cosin = cos((360 - lensData[g][2]) * 0.0175);
 						sinus = sin((360 - lensData[g][2]) * 0.0175);
-						float shhhit[2];
-						shhhit[0] = shit[0] * cosin - shit[1] * sinus;
-						shhhit[1] = shit[0] * sinus + shit[1] * cosin;
-						if (abs(shhhit[0]) <= 1 && abs(shhhit[1]) <= 100)
+
+						float arraySC[2];
+						arraySC[0] = helpContein[0] * cosin - helpContein[1] * sinus;
+						arraySC[1] = helpContein[0] * sinus + helpContein[1] * cosin;
+
+						if (abs(arraySC[0]) <= 1 && abs(arraySC[1]) <= 100)
 						{
-							if (abs(shhhit[0]) <= 1 && abs(shhhit[1]) > 90)
+							if (abs(arraySC[0]) <= 1 && abs(arraySC[1]) > 90)
 							{
 								lightcords[0] = -100;
 								lightcords[1] = -100;
-								g = countLenses + 1;
+								g = count + 1;
 							}
 							else
 							{
 								bool vpered = true;
 								if (true)
 								{
-									float shiiiit[2];
-									shiiiit[0] = lightcords[0];
-									shiiiit[1] = lightcords[1];
-									shiiiit[0] += move[0] * 200;
-									shiiiit[1] += move[1] * 200;
-									float fosucshit[2];
-									float fosucshit1[2];
+									float array1[2];
+									array1[0] = lightcords[0];
+									array1[1] = lightcords[1];
+									array1[0] += move[0] * 200;
+									array1[1] += move[1] * 200;
+									float fosuchelpContein[2];
+									float fosuchelpContein1[2];
 									cosin = cos((lensData[g][2]) * 0.0175);
 									sinus = sin((lensData[g][2]) * 0.0175);
-									fosucshit[0] = lensData[g][0] + refractiveIndexLenses[g] * cosin;
-									fosucshit[1] = lensData[g][1] + refractiveIndexLenses[g] * sinus;
-									fosucshit1[0] = lensData[g][0] - refractiveIndexLenses[g] * cosin;
-									fosucshit1[1] = lensData[g][1] - refractiveIndexLenses[g] * sinus;
-									if (getLengthVector(shiiiit, fosucshit1) < getLengthVector(shiiiit, fosucshit))
+									fosuchelpContein[0] = lensData[g][0] + refractiveIndexLenses[g] * cosin;
+									fosuchelpContein[1] = lensData[g][1] + refractiveIndexLenses[g] * sinus;
+									fosuchelpContein1[0] = lensData[g][0] - refractiveIndexLenses[g] * cosin;
+									fosuchelpContein1[1] = lensData[g][1] - refractiveIndexLenses[g] * sinus;
+									if (getLengthVector(array1, fosuchelpContein1) < getLengthVector(array1, fosuchelpContein))
 										vpered = false;
 								}
 
 
 								float newmove[2];
 								float heremove[2];
-								float fuckingshit[2];
+								float fuckinghelpContein[2];
 								float herelensData[3];
 								herelensData[0] = 100;
 								herelensData[1] = 200;
@@ -436,23 +369,23 @@ int main()
 								{
 									heremove[0] = -heremove[0];
 									heremove[1] = -heremove[1];
-									shhhit[0] = -shhhit[0];
-									shhhit[1] = -shhhit[1];
+									arraySC[0] = -arraySC[0];
+									arraySC[1] = -arraySC[1];
 								}
-								fuckingshit[0] = refractiveIndexLenses[g];
-								fuckingshit[1] = (refractiveIndexLenses[g] / heremove[0]) * heremove[1];
+								fuckinghelpContein[0] = refractiveIndexLenses[g];
+								fuckinghelpContein[1] = (refractiveIndexLenses[g] / heremove[0]) * heremove[1];
 
 								if (true)
 								{
-									float fuckit[2];
-									float fuckit2[2];
-									fuckit[0] = herelensData[0] - shhhit[0];
-									fuckit[1] = herelensData[1] - shhhit[1];
-									fuckit2[0] = herelensData[0] + fuckingshit[0];
-									fuckit2[1] = herelensData[1] + fuckingshit[1];
-									float dist = getLengthVector(fuckit, fuckit2);
-									newmove[0] = -(fuckit[0] - fuckit2[0]) / dist;
-									newmove[1] = -(fuckit[1] - fuckit2[1]) / dist;
+									float coord[2];
+									float coord2[2];
+									coord[0] = herelensData[0] - arraySC[0];
+									coord[1] = herelensData[1] - arraySC[1];
+									coord2[0] = herelensData[0] + fuckinghelpContein[0];
+									coord2[1] = herelensData[1] + fuckinghelpContein[1];
+									float dist = getLengthVector(coord, coord2);
+									newmove[0] = -(coord[0] - coord2[0]) / dist;
+									newmove[1] = -(coord[1] - coord2[1]) / dist;
 								}
 
 								if (refractiveIndexLenses[g] < 0)
@@ -481,25 +414,25 @@ int main()
 
 								if (true)
 								{
-									bool shit = true;
-									while (shit)
+									bool helpContein = true;
+									while (helpContein)
 									{
 										if (true)
 										{
 											float cosin1;
 											float sinus1;
-											float shit1[2];
-											shit1[0] = lensData[g][0] - lightcords[0];
-											shit1[1] = lensData[g][1] - lightcords[1];
+											float helpContein1[2];
+											helpContein1[0] = lensData[g][0] - lightcords[0];
+											helpContein1[1] = lensData[g][1] - lightcords[1];
 											cosin1 = cos((360 - lensData[g][2]) * 0.0175);
 											sinus1 = sin((360 - lensData[g][2]) * 0.0175);
-											float shhhit1[2];
-											shhhit1[0] = shit1[0] * cosin1 - shit1[1] * sinus1;
-											shhhit1[1] = shit1[0] * sinus1 + shit1[1] * cosin1;
-											if (abs(shhhit1[0]) <= 1 && abs(shhhit1[1]) <= 100)
-												shit = true;
+											float arraySC1[2];
+											arraySC1[0] = helpContein1[0] * cosin1 - helpContein1[1] * sinus1;
+											arraySC1[1] = helpContein1[0] * sinus1 + helpContein1[1] * cosin1;
+											if (abs(arraySC1[0]) <= 1 && abs(arraySC1[1]) <= 100)
+												helpContein = true;
 											else
-												shit = false;
+												helpContein = false;
 										}
 										lightcords[0] += move[0];
 										lightcords[1] += move[1];
@@ -510,7 +443,7 @@ int main()
 
 								if (show)
 								{
-									if (g == choosenlens)
+									if (g == choosenLens)
 										point_s[0].setColor(Color(220, 220, 220, 100));
 									else
 										point_s[0].setColor(Color(255, 255, 255, 100));
@@ -521,9 +454,9 @@ int main()
 									if (refractiveIndexLenses[g] > 0)
 										for (int i = -100; i < 101; i += 2)
 										{
-											int shit = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
-											if (shit >= refr) shit = refr - 1;
-											for (int u = -(shit * (1 - fuck)) - refr * fuck; u < (shit * (1 - fuck)) + refr * fuck; u++)
+											int helpContein = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
+											if (helpContein >= refr) helpContein = refr - 1;
+											for (int u = -(helpContein * (1 - fuck)) - refr * fuck; u < (helpContein * (1 - fuck)) + refr * fuck; u++)
 											{
 												point_s[0].setPosition(herelensData[0] + u, herelensData[1] + i);
 												window.draw(point_s[0]);
@@ -534,12 +467,12 @@ int main()
 										refr = abs(refr);
 										for (int i = -100; i < 101; i += 2)
 										{
-											int shit = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
-											shit -= refr;
-											shit = abs(shit);
-											if (shit >= refr - 2) shit = refr - 2;
-											if (shit <= 1) shit = 1;
-											for (int u = (-(shit * (1 - fuck)) - refr * fuck); u < ((shit * (1 - fuck)) + refr * fuck); u++)
+											int helpContein = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
+											helpContein -= refr;
+											helpContein = abs(helpContein);
+											if (helpContein >= refr - 2) helpContein = refr - 2;
+											if (helpContein <= 1) helpContein = 1;
+											for (int u = (-(helpContein * (1 - fuck)) - refr * fuck); u < ((helpContein * (1 - fuck)) + refr * fuck); u++)
 											{
 												point_s[0].setPosition(herelensData[0] + u, herelensData[1] + i);
 												window.draw(point_s[0]);
@@ -548,13 +481,13 @@ int main()
 									}
 									point_s[1].setColor(Color(255, 0, 0));
 									point_s[1].setScale(5, 5);
-									point_s[1].setPosition(int(herelensData[0] - shhhit[0]), int(herelensData[1] - shhhit[1]));
+									point_s[1].setPosition(int(herelensData[0] - arraySC[0]), int(herelensData[1] - arraySC[1]));
 									window.draw(point_s[1]);
 									point_s[1].setScale(1, 1);
 									point_s[1].setColor(Color(255, 255, 255));
 									for (int i = 0; i < 25; i++)
 									{
-										point_s[1].setPosition(int(herelensData[0] - shhhit[0] + heremove[0] * i), int(herelensData[1] - shhhit[1] + heremove[1] * i));
+										point_s[1].setPosition(int(herelensData[0] - arraySC[0] + heremove[0] * i), int(herelensData[1] - arraySC[1] + heremove[1] * i));
 										window.draw(point_s[1]);
 									}
 
@@ -565,12 +498,12 @@ int main()
 										window.draw(point_s[1]);
 									}
 									point_s[1].setColor(Color(255, 255, 255));
-									for (int i = 0; abs(i) < abs(fuckingshit[1]); i++)
+									for (int i = 0; abs(i) < abs(fuckinghelpContein[1]); i++)
 									{
-										point_s[1].setPosition(int(herelensData[0] + refractiveIndexLenses[g]), int(herelensData[1] + i * fuckingshit[1] / abs(fuckingshit[1])));
+										point_s[1].setPosition(int(herelensData[0] + refractiveIndexLenses[g]), int(herelensData[1] + i * fuckinghelpContein[1] / abs(fuckinghelpContein[1])));
 										window.draw(point_s[1]);
 									}
-									for (int i = 0; i < fuckingshit[0]; i++)
+									for (int i = 0; i < fuckinghelpContein[0]; i++)
 									{
 										point_s[1].setPosition(int(herelensData[0] + i), int(herelensData[1]));
 										window.draw(point_s[1]);
@@ -578,7 +511,7 @@ int main()
 									point_s[1].setColor(Color(0, 0, 255));
 									for (int i = 0; i < 90; i++)
 									{
-										point_s[1].setPosition(int(herelensData[0] - shhhit[0] + newmove[0] * i), int(herelensData[1] - shhhit[1] + newmove[1] * i));
+										point_s[1].setPosition(int(herelensData[0] - arraySC[0] + newmove[0] * i), int(herelensData[1] - arraySC[1] + newmove[1] * i));
 										window.draw(point_s[1]);
 									}
 									point_s[1].setColor(Color(255, 255, 255));
@@ -590,13 +523,13 @@ int main()
 					float pastlightcords[2];
 					pastlightcords[0] = lightcords[0];
 					pastlightcords[1] = lightcords[1];
-					float shitt = 1000;
-					for (int g = 0; g < countLenses; g++)
+					float helpConteint = 1000;
+					for (int g = 0; g < count; g++)
 					{
-						float sshitt = sqrt(pow(lightcords[0] - lensData[g][0], 2) + pow(lightcords[1] - lensData[g][1], 2));
-						if (shitt > sshitt) shitt = sshitt;
+						float shelpConteint = sqrt(pow(lightcords[0] - lensData[g][0], 2) + pow(lightcords[1] - lensData[g][1], 2));
+						if (helpConteint > shelpConteint) helpConteint = shelpConteint;
 					}
-					if (shitt > 250)
+					if (helpConteint > 250)
 					{
 						for (int g = 0; g < 65; g++)
 						{
@@ -623,12 +556,12 @@ int main()
 
 		if (true)
 		{
-			for (int g = 0; g < countLenses; g++)
+			for (int g = 0; g < count; g++)
 			{
-				if (g == choosenlens)
-					s_len[g].setColor(Color(220, 220, 220, 180));
+				if (g == choosenLens)
+					s_len[g].setColor(Color(220, 220, 220, 255));
 				else
-					s_len[g].setColor(Color(255, 255, 255, 180));
+					s_len[g].setColor(Color(192, 246, 254, 255));
 
 				if (lensData[g][3] == 1)
 				{
@@ -646,18 +579,18 @@ int main()
 								shiiit = 1;
 							else
 								shiiit = 3;
-							int shit = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
-							if (shit >= refr) shit = refr - 1;
-							int w = int(((shit * (1 - fuck)) - refr * fuck) * 2);
+							int helpContein = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
+							if (helpContein >= refr) helpContein = refr - 1;
+							int w = int(((helpContein * (1 - fuck)) - refr * fuck) * 2);
 
-							for (int u = (-(shit * (1 - fuck)) - refr * fuck) + 250; u < 250 + ((shit * (1 - fuck)) + refr * fuck); u++)
+							for (int u = (-(helpContein * (1 - fuck)) - refr * fuck) + 250; u < 250 + ((helpContein * (1 - fuck)) + refr * fuck); u++)
 							{
 								if (shiiit == 1) len_image.setPixel(u, i + 100, Color(85, 150, 170));
 								if (shiiit == 3) len_image.setPixel(u, i + 100, Color(150, 215, 235));
 							}
 							len_t[g].loadFromImage(len_image);
 							s_len[g].setTexture(len_t[g]);
-							s_len[g].setColor(Color(255, 255, 255, 180));
+							s_len[g].setColor(Color(192, 246, 254, 255));
 							window.draw(s_len[g]);
 						}
 					else
@@ -670,19 +603,19 @@ int main()
 								shiiit = 1;
 							else
 								shiiit = 3;
-							int shit = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
-							shit -= refr;
-							shit = abs(shit);
-							if (shit >= refr - 2) shit = refr - 2;
-							if (shit <= 1) shit = 1;
-							for (int u = (-(shit * (1 - fuck)) - refr * fuck) + 250; u < ((shit * (1 - fuck)) + refr * fuck) + 250; u++)
+							int helpContein = int(sqrt(abs(pow(refr, 2)) - (i * i * abs(pow(refr, 2))) / 10000));
+							helpContein -= refr;
+							helpContein = abs(helpContein);
+							if (helpContein >= refr - 2) helpContein = refr - 2;
+							if (helpContein <= 1) helpContein = 1;
+							for (int u = (-(helpContein * (1 - fuck)) - refr * fuck) + 250; u < ((helpContein * (1 - fuck)) + refr * fuck) + 250; u++)
 							{
 								if (shiiit == 1) len_image.setPixel(u, i + 100, Color(85, 150, 170));
 								if (shiiit == 3) len_image.setPixel(u, i + 100, Color(150, 215, 235));
 							}
 							len_t[g].loadFromImage(len_image);
 							s_len[g].setTexture(len_t[g]);
-							s_len[g].setColor(Color(255, 255, 255, 180));
+							s_len[g].setColor(Color(192, 246, 254, 255));
 							window.draw(s_len[g]);
 						}
 					}
@@ -691,25 +624,12 @@ int main()
 			}
 		}
 
-		for (int g = 0; g < countLenses; g++)
+		for (int g = 0; g < count; g++)
 			window.draw(s_len[g]);
 
-		for (int i = 0; i < qofstuff; i++) window.draw(s_stuff[i]);
 
-		smalls_bg.setPosition(getviewx() - int(W / 2) + int(W / 455), getviewy() - int(H / 2));
-		window.draw(smalls_bg);
-
-		std::ostringstream thing;
-		thing << int((2000 / time) / 2);
-		thing << " fps";
-		text.setString(thing.str());//задаем строку тексту и вызываем сформированную выше строку методом .str() 
-		text.setPosition(getviewx() - int(W / 2) + 21, getviewy() - int(H / 2) + 6);//задаем позицию текста, отступая от центра камеры
-		window.draw(text);
-
-		s_exit.setPosition(getviewx() + int(W / 2) - 126, getviewy() - int(H / 2) + stuffy);
-		window.draw(s_exit);
 		window.display();
-		// 1 к 9
+		
 	}
 	return 0;
 }
